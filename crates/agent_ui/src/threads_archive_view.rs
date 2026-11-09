@@ -269,6 +269,7 @@ impl ThreadsArchiveView {
     }
 
     fn update_items(&mut self, cx: &mut Context<Self>) {
+        let open_terminals = crate::ryanzed_resume::open_terminal_rows(cx); // fork
         let store = ThreadMetadataStore::global(cx).read(cx);
 
         // If we're filtering to archived threads but none remain (e.g. the
@@ -283,6 +284,7 @@ impl ThreadsArchiveView {
         let thread_filter = self.thread_filter;
         let sessions = store
             .entries()
+            .chain(&open_terminals) // fork: open terminal threads are history too
             .filter(|t| match thread_filter {
                 ThreadFilter::All => true,
                 ThreadFilter::ArchivedOnly => t.archived,
