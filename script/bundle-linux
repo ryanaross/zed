@@ -231,8 +231,8 @@ elif [[ "$channel" == "dev" ]]; then
   export APP_NAME="Zed Devel"
   APP_ID="dev.zed.Zed-Dev"
 else
-  export APP_NAME="Zed"
-  APP_ID="dev.zed.Zed"
+  export APP_NAME="RyanZed"
+  APP_ID="dev.ryanaross.RyanZed"
 fi
 
 mkdir -p "${zed_dir}/share/applications"
