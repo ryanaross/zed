@@ -168,7 +168,9 @@ ssh home 'ps -eo args | awk "\$1 ~ /ryanzed\.app/" | wc -l'          # 0 = exite
   - Resume after a restart: codex over SSH (`codex resume '<thread name>'`), and local claude (`claude --resume <id>`) and pi (`pi --session <file>`). The active terminal resumes at launch; the others resume when opened. pi writes no session file until the first message, so a pi with no messages yet restarts fresh.
   - Thread history lists open and closed terminal threads above the ACP threads.
   - Updates: the command palette has no "check for updates" command, and the log shows no update polling.
+- Verified on the Mac (`-8`): the RyanZed menu has no "Check for Updates", and the active claude terminal resumes after a restart. Builds from before the resume feature (`-4` and older) recorded nothing, so their terminals started fresh once; four were backfilled by matching titles to `~/.claude/projects` transcripts.
+- The Mac app is signed with the local "Meeting Recorder Local" identity (`MAC_SIGN_IDENTITY` in `ci.sh`), so keychain access survives redeploys. An ad-hoc signature re-prompted on every build.
+- Launch RyanZed through LaunchServices (`open -b dev.ryanaross.RyanZed`), not from a claude session. It would inherit `CLAUDE_CODE_CHILD_SESSION`, and claude in its terminals then stops saving transcripts.
 - Not verified:
-  - The Mac app, including the removed "Check for Updates" menu item, until it is restarted onto `-8`.
   - Remote claude resumes with `claude --continue` (latest session in the directory), not by id. Remote pi isn't detected.
   - `--sync` with no new tag, `--rollback`, and the `cargo fmt` failure path.
