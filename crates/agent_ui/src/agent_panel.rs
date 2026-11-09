@@ -1131,6 +1131,8 @@ pub struct AgentPanel {
     retained_threads: HashMap<ThreadId, Entity<ConversationView>>,
     terminals: HashMap<TerminalId, AgentTerminal>,
     pending_terminal_spawn: Option<TerminalId>,
+    /// fork: the terminal the panel opened on its own when first shown.
+    initial_terminal_id: Option<TerminalId>,
     #[cfg(test)]
     test_terminal_spawn_gate: Option<futures::channel::oneshot::Receiver<()>>,
     new_thread_menu_handle: PopoverMenuHandle<ContextMenu>,
@@ -1552,6 +1554,7 @@ impl AgentPanel {
             retained_threads: HashMap::default(),
             terminals: HashMap::default(),
             pending_terminal_spawn: None,
+            initial_terminal_id: None, // fork
             #[cfg(test)]
             test_terminal_spawn_gate: None,
             new_thread_menu_handle: PopoverMenuHandle::default(),
@@ -3403,6 +3406,14 @@ impl AgentPanel {
         true
     }
 
+    /// fork: whether the panel opened (or is opening) a terminal on its own when first
+    /// shown, so a "new terminal" request right after opening can use that one.
+    pub fn has_initial_terminal(&self) -> bool {
+        self.initial_terminal_id.is_some_and(|id| {
+            self.pending_terminal_spawn == Some(id) || self.terminals.contains_key(&id)
+        })
+    }
+
     pub fn terminals(&self, cx: &App) -> Vec<AgentPanelTerminalInfo> {
         self.terminals
             .iter()
@@ -5211,6 +5222,7 @@ impl AgentPanel {
             return;
         }
         let working_directory = self.terminal_working_directory(None, cx);
+        self.initial_terminal_id = Some(terminal_id); // fork
         self.spawn_initial_terminal(terminal_id, working_directory, source, window, cx);
     }
 
