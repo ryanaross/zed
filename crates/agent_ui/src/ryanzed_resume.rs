@@ -392,8 +392,9 @@ enum RemoteTitle {
 
 /// Reads which agent a remote terminal runs from the title the agent sets.
 /// - codex: `<thread name> | <dir>`, resumed by thread name.
-/// - claude: `✳ <topic>` (or a braille spinner while working); the title carries no
-///   session id, so it resumes the latest session in the directory.
+/// - claude: `✳ <topic>` (or a braille spinner while working), and pi: `π - <dir>`.
+///   Their titles carry no session id, so they resume the latest session in the
+///   directory.
 fn remote_resume_from_title(title: &str) -> RemoteTitle {
     let title = title.trim();
     let first = title.chars().next();
@@ -415,6 +416,12 @@ fn remote_resume_from_title(title: &str) -> RemoteTitle {
         return RemoteTitle::Agent {
             program: "claude".into(),
             command: "claude --continue".into(),
+        };
+    }
+    if title.starts_with("π - ") {
+        return RemoteTitle::Agent {
+            program: "pi".into(),
+            command: "pi --continue".into(),
         };
     }
     let is_prompt = title.split_once(": ").is_some_and(|(user_host, _)| {
@@ -560,6 +567,10 @@ mod tests {
         assert_eq!(
             remote_resume_from_title("✳ zed-fork-setup"),
             agent("claude", "claude --continue")
+        );
+        assert_eq!(
+            remote_resume_from_title("π - esphome"),
+            agent("pi", "pi --continue")
         );
         assert_eq!(
             remote_resume_from_title("ryross@flux: ~/thoughtd"),
