@@ -26,6 +26,8 @@ OS="$(uname -s)"
 REMOTE_REPO=/mnt/data/build/zed      # build checkout on home (its / is too small)
 REMOTE_LOGS=/mnt/data/build/logs
 MIN_FREE_GB=60
+TEST_TIMEOUT=15m           # whole cargo test step
+HOME_BUILD_TIMEOUT_MIN=90  # home build from the Mac
 LOG_DIR="${RYANZED_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/ryanzed/logs}"
 
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -34,7 +36,7 @@ if [[ "$OS" == Darwin ]]; then
   export DEVELOPER_DIR="${DEVELOPER_DIR:-$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)/Contents/Developer}"
 fi
 
-SYNC=false; ONLY=""; SKIP_TESTS=false; SKIP_CHECKS=false; ROLLBACK=""
+SYNC=false; REBASED=false; ONLY=""; SKIP_TESTS=false; SKIP_CHECKS=false; ROLLBACK=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --sync) SYNC=true ;;
@@ -114,6 +116,7 @@ if $SYNC; then
     git rebase --onto "$latest" "$BASE" patches \
       || die "rebase conflict. Resolve, 'git rebase --continue', then re-run ci.sh"
     BASE="$latest"
+    REBASED=true
   fi
 fi
 
@@ -123,12 +126,29 @@ if $SKIP_CHECKS; then echo "skipped"; else
   cargo fmt --all -- --check
   cargo check -q -p zed
   if ! $SKIP_TESTS; then
-    crates="$(git diff --name-only "$BASE"..HEAD | sed -nE 's#^crates/([^/]+)/.*#\1#p' | sort -u)"
-    for c in $crates; do
-      pkg="$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' "crates/$c/Cargo.toml" | head -1)"
-      echo "-- cargo test -p $pkg"
-      cargo test -q -p "$pkg"
+    # Test only what changed since the last deploy that is still in HEAD's history. After a
+    # --sync rebase (or with no such deploy) that is everything the fork touches since BASE.
+    since="$BASE"
+    if ! $REBASED; then
+      for t in $(git tag -l "ryanzed/$BASE-*" | sort -V -r); do
+        if git merge-base --is-ancestor "$t" HEAD; then since="$t"; break; fi
+      done
+    fi
+    pkgs=()
+    for c in $(git diff --name-only "$since"..HEAD | sed -nE 's#^crates/([^/]+)/.*#\1#p' | sort -u); do
+      [[ -f "crates/$c/Cargo.toml" ]] || continue
+      pkgs+=(-p "$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' "crates/$c/Cargo.toml" | head -1)")
     done
+    if (( ${#pkgs[@]} == 0 )); then
+      echo "no crates changed since $since; no tests"
+    else
+      # One cargo invocation builds the test binaries together. The timeout catches a hung
+      # test (upstream tests can wait forever on behaviour the fork removed).
+      echo "-- cargo test ${pkgs[*]} (changes since $since)"
+      tmo=(); command -v timeout >/dev/null && tmo=(timeout "$TEST_TIMEOUT")
+      ${tmo[@]+"${tmo[@]}"} cargo test -q "${pkgs[@]}" \
+        || die "tests failed or hit the ${TEST_TIMEOUT} timeout (see the log for the last test running)"
+    fi
   fi
 fi
 
@@ -173,7 +193,14 @@ fi
 
 if want home && [[ "$OS" == Darwin ]]; then
   echo "waiting for home build..."
-  until ssh home "test -f $REMOTE_LOGS/$SHA.status"; do sleep 30; done
+  deadline=$(( $(date +%s) + HOME_BUILD_TIMEOUT_MIN * 60 ))
+  until ssh home "test -f $REMOTE_LOGS/$SHA.status"; do
+    (( $(date +%s) < deadline )) || die "home build still running after ${HOME_BUILD_TIMEOUT_MIN} min, log: home:$REMOTE_LOGS/$SHA.log"
+    # [r] keeps pgrep from matching the remote shell running this very command.
+    ssh home "pgrep -f '[r]yanzed/install-linux.sh' >/dev/null || test -f $REMOTE_LOGS/$SHA.status" \
+      || die "home build exited without a status, log: home:$REMOTE_LOGS/$SHA.log"
+    sleep 30
+  done
   status="$(ssh home "cat $REMOTE_LOGS/$SHA.status")"
   if [[ "$status" != 0 ]]; then
     ssh home "tail -40 $REMOTE_LOGS/$SHA.log"
