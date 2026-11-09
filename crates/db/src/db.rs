@@ -146,7 +146,11 @@ pub trait DbScope {
 
 impl DbScope for ReleaseChannel {
     fn scope_name(&self) -> &str {
-        self.dev_name()
+        // fork: keep RyanZed state apart from official Zed's.
+        match self {
+            ReleaseChannel::Stable => "ryanzed-stable",
+            _ => self.dev_name(),
+        }
     }
 }
 

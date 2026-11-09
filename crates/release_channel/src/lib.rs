@@ -199,7 +199,8 @@ impl ReleaseChannel {
 
     /// Returns whether we want to poll for updates for this [`ReleaseChannel`]
     pub fn poll_for_updates(&self) -> bool {
-        !matches!(self, ReleaseChannel::Dev)
+        // fork: RyanZed is deployed by its own CI, never by the upstream updater.
+        false
     }
 
     /// Returns the display name for this [`ReleaseChannel`].
@@ -208,7 +209,7 @@ impl ReleaseChannel {
             ReleaseChannel::Dev => "Zed Dev",
             ReleaseChannel::Nightly => "Zed Nightly",
             ReleaseChannel::Preview => "Zed Preview",
-            ReleaseChannel::Stable => "Zed",
+            ReleaseChannel::Stable => "RyanZed", // fork: rebrand
         }
     }
 
@@ -230,7 +231,7 @@ impl ReleaseChannel {
             ReleaseChannel::Dev => "dev.zed.Zed-Dev",
             ReleaseChannel::Nightly => "dev.zed.Zed-Nightly",
             ReleaseChannel::Preview => "dev.zed.Zed-Preview",
-            ReleaseChannel::Stable => "dev.zed.Zed",
+            ReleaseChannel::Stable => "dev.ryanaross.RyanZed", // fork: rebrand
         }
     }
 
