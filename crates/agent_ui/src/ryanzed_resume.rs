@@ -232,17 +232,17 @@ pub(crate) fn on_terminal_closed(
     cx: &mut App,
 ) {
     cx.default_global::<Tracker>().live.remove(&id);
-    let Some(record) = record(id, cx) else {
-        return;
-    };
+    let record = record(id, cx);
     let Some(metadata) = metadata else {
-        set_record(id, None, cx);
+        if record.is_some() {
+            set_record(id, None, cx);
+        }
         return;
     };
 
     let title = metadata.editable_title();
     let title = if title.trim().is_empty() {
-        record.program.into()
+        record.map_or_else(|| "Terminal".into(), |record| record.program.into())
     } else {
         title
     };
@@ -263,6 +263,39 @@ pub(crate) fn on_terminal_closed(
     ThreadMetadataStore::global(cx).update(cx, |store, cx| store.save(thread, cx));
 }
 
+/// Open terminal threads as thread-history rows, so history lists them next to open
+/// agent threads.
+pub fn open_terminal_rows(cx: &App) -> Vec<ThreadMetadata> {
+    let Some(store) = TerminalThreadMetadataStore::try_global(cx) else {
+        return Vec::new();
+    };
+    store
+        .read(cx)
+        .entries()
+        .map(|terminal| ThreadMetadata {
+            thread_id: ThreadId::new(),
+            session_id: Some(acp::SessionId::new(terminal.terminal_id.to_key_string())),
+            agent_id: AgentId::new(TERMINAL_HISTORY_AGENT_ID),
+            title: Some(terminal.editable_title()),
+            title_override: None,
+            updated_at: terminal.created_at,
+            created_at: Some(terminal.created_at),
+            interacted_at: None,
+            worktree_paths: terminal.worktree_paths.clone(),
+            remote_connection: terminal.remote_connection.clone(),
+            archived: false,
+        })
+        .collect()
+}
+
+fn open_terminal(id: TerminalId, cx: &App) -> Option<TerminalThreadMetadata> {
+    TerminalThreadMetadataStore::try_global(cx)?
+        .read(cx)
+        .entries()
+        .find(|terminal| terminal.terminal_id == id)
+        .cloned()
+}
+
 pub fn is_terminal_history(agent_id: &AgentId) -> bool {
     agent_id.as_ref() == TERMINAL_HISTORY_AGENT_ID
 }
@@ -281,6 +314,9 @@ pub fn reopen_from_history(
     cx: &mut App,
 ) -> Option<TerminalThreadMetadata> {
     let id = history_terminal_id(thread)?;
+    if let Some(open) = open_terminal(id, cx) {
+        return Some(open);
+    }
     let record = record(id, cx).map(|record| Record {
         running: true,
         ..record
@@ -321,6 +357,7 @@ pub(crate) fn delete_history(
     ThreadMetadataStore::global(cx).update(cx, |store, cx| store.delete(thread_id, cx));
     if let Some(id) =
         session_id.and_then(|session_id| TerminalId::from_key_string(session_id.0.as_ref()).ok())
+        && open_terminal(id, cx).is_none()
     {
         set_record(id, None, cx);
     }
