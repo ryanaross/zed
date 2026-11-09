@@ -311,7 +311,7 @@ osx_info_plist_exts = ["resources/info/*"]
 osx_url_schemes = ["zed"]
 
 [package.metadata.bundle-stable]
-icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
+icon = ["resources/app-icon-ryanzed@2x.png", "resources/app-icon-ryanzed.png"] # fork: RyanZed icon
 identifier = "dev.ryanaross.RyanZed"
 name = "RyanZed"
 category = "Developer Tool"
