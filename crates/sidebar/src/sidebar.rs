@@ -1376,6 +1376,18 @@ impl Sidebar {
             let workspace = task.await?;
             this.update_in(cx, |this, window, cx| match target {
                 NewEntryTarget::LastCreatedKind => this.create_new_entry(&workspace, window, cx),
+                // fork: a just-opened workspace's panel opens its own initial terminal;
+                // use that instead of adding a second.
+                NewEntryTarget::Terminal
+                    if workspace
+                        .read(cx)
+                        .panel::<AgentPanel>(cx)
+                        .is_some_and(|panel| panel.read(cx).has_initial_terminal()) =>
+                {
+                    workspace.update(cx, |workspace, cx| {
+                        workspace.focus_panel::<AgentPanel>(window, cx);
+                    });
+                }
                 NewEntryTarget::Terminal => this.create_new_terminal(&workspace, window, cx),
             })?;
             anyhow::Ok(())
