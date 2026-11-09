@@ -1402,6 +1402,7 @@ mod tests {
     }
 
     #[gpui::test]
+    #[ignore = "fork: RyanZed never polls for updates (poll_for_updates is false)"]
     async fn test_auto_update_downloads(cx: &mut TestAppContext) {
         cx.background_executor.allow_parking();
         zlog::init_test();
