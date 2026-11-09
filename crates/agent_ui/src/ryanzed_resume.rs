@@ -6,6 +6,9 @@
 //! store. Restoring the terminal (on startup, or from the sidebar) runs that command
 //! instead of `agent.terminal_init_command`.
 //!
+//! In a remote (ssh) terminal the agent runs on the other host, so the agent is read
+//! from the terminal title it sets instead (see `remote_resume_from_title`).
+//!
 //! Closing an agent terminal saves an archived thread-history row with
 //! `agent_id == TERMINAL_HISTORY_AGENT_ID` and the terminal id as its session id.
 //! Opening that row reopens the terminal and resumes the session.
@@ -110,7 +113,7 @@ pub(crate) fn resume_command(id: TerminalId, cx: &mut App) -> Option<String> {
 /// Called whenever the terminal reports activity. Cheap: does real work at most every
 /// `CHECK_INTERVAL` per terminal, and file lookups run in the background.
 pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App) {
-    let (program, pid, cwd) = {
+    let (program, pid, cwd, title) = {
         let terminal = terminal.read(cx);
         let Some(program) = terminal.foreground_process_command_name() else {
             return;
@@ -119,6 +122,7 @@ pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App)
             program,
             terminal.pid().map(|pid| pid.as_u32()),
             terminal.working_directory(),
+            terminal.breadcrumb_text.clone(),
         )
     };
 
@@ -143,6 +147,32 @@ pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App)
         return;
     }
     live.last_check = Some(now);
+
+    // A remote (ssh) terminal: the agent runs on the other host, so its process and
+    // session files are out of reach. Go by the terminal title the agent sets instead.
+    if program == "ssh" {
+        match remote_resume_from_title(&title) {
+            RemoteTitle::Agent { program, command } => {
+                let updated = Some(Record {
+                    program,
+                    command,
+                    running: true,
+                    working_directory: cwd,
+                });
+                if updated != record(id, cx) {
+                    set_record(id, updated, cx);
+                }
+            }
+            RemoteTitle::Shell => {
+                if let Some(mut record) = record(id, cx).filter(|record| record.running) {
+                    record.running = false;
+                    set_record(id, Some(record), cx);
+                }
+            }
+            RemoteTitle::Unknown => {}
+        }
+        return;
+    }
 
     if !AGENTS.contains(&program.as_str()) {
         if let Some(mut record) = record(id, cx).filter(|record| record.running) {
@@ -312,6 +342,54 @@ fn find_resume_command(
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum RemoteTitle {
+    Agent {
+        program: String,
+        command: String,
+    },
+    /// The default bash prompt title, `user@host: dir`: no agent running.
+    Shell,
+    Unknown,
+}
+
+/// Reads which agent a remote terminal runs from the title the agent sets.
+/// - codex: `<thread name> | <dir>`, resumed by thread name.
+/// - claude: `✳ <topic>` (or a braille spinner while working); the title carries no
+///   session id, so it resumes the latest session in the directory.
+fn remote_resume_from_title(title: &str) -> RemoteTitle {
+    let title = title.trim();
+    let first = title.chars().next();
+    let status_glyph = first.is_some_and(|c| c == '✳' || ('\u{2800}'..='\u{28ff}').contains(&c));
+    let rest = if status_glyph {
+        title[first.map_or(0, char::len_utf8)..].trim_start()
+    } else {
+        title
+    };
+    if let Some((name, _dir)) = rest.rsplit_once(" | ")
+        && !name.trim().is_empty()
+    {
+        return RemoteTitle::Agent {
+            program: "codex".into(),
+            command: format!("codex resume {}", shell_quote(name.trim())),
+        };
+    }
+    if status_glyph {
+        return RemoteTitle::Agent {
+            program: "claude".into(),
+            command: "claude --continue".into(),
+        };
+    }
+    let is_prompt = title.split_once(": ").is_some_and(|(user_host, _)| {
+        user_host.contains('@') && !user_host.contains(char::is_whitespace)
+    });
+    if is_prompt {
+        RemoteTitle::Shell
+    } else {
+        RemoteTitle::Unknown
+    }
+}
+
 fn dir_from_env(var: &str, default: &[&str]) -> PathBuf {
     std::env::var_os(var).map(PathBuf::from).unwrap_or_else(|| {
         default
@@ -426,6 +504,35 @@ mod tests {
     fn test_shell_quote() {
         assert_eq!(shell_quote("/a b/c.jsonl"), "'/a b/c.jsonl'");
         assert_eq!(shell_quote("it's"), r"'it'\''s'");
+    }
+
+    #[test]
+    fn test_remote_resume_from_title() {
+        let agent = |program: &str, command: &str| RemoteTitle::Agent {
+            program: program.into(),
+            command: command.into(),
+        };
+        assert_eq!(
+            remote_resume_from_title("AubergeRP | ryross"),
+            agent("codex", "codex resume 'AubergeRP'")
+        );
+        assert_eq!(
+            remote_resume_from_title("⠋ Confirm living room guardian | ryross"),
+            agent("codex", "codex resume 'Confirm living room guardian'")
+        );
+        assert_eq!(
+            remote_resume_from_title("✳ zed-fork-setup"),
+            agent("claude", "claude --continue")
+        );
+        assert_eq!(
+            remote_resume_from_title("ryross@flux: ~/thoughtd"),
+            RemoteTitle::Shell
+        );
+        assert_eq!(remote_resume_from_title(""), RemoteTitle::Unknown);
+        assert_eq!(
+            remote_resume_from_title("vim notes.md"),
+            RemoteTitle::Unknown
+        );
     }
 
     #[test]
