@@ -30,7 +30,7 @@ fn address() -> SocketAddr {
     let port = match *release_channel::RELEASE_CHANNEL {
         ReleaseChannel::Dev => 43737,
         ReleaseChannel::Preview => 43737 + USER_BLOCK,
-        ReleaseChannel::Stable => 43737 + (2 * USER_BLOCK),
+        ReleaseChannel::Stable => 43737 + (5 * USER_BLOCK), // fork: own port so RyanZed runs beside Zed
         ReleaseChannel::Nightly => 43737 + (3 * USER_BLOCK),
     };
     let uid = getuid().as_raw();
@@ -49,7 +49,7 @@ fn instance_handshake() -> &'static str {
         ReleaseChannel::Dev => "Zed Editor Dev Instance Running",
         ReleaseChannel::Nightly => "Zed Editor Nightly Instance Running",
         ReleaseChannel::Preview => "Zed Editor Preview Instance Running",
-        ReleaseChannel::Stable => "Zed Editor Stable Instance Running",
+        ReleaseChannel::Stable => "RyanZed Editor Stable Instance Running",
     }
 }
 
