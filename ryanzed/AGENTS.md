@@ -51,7 +51,7 @@ Move any existing `0-ryanzed-stable` aside before seeding; don't delete it.
 
 ## Machines
 ### Mac (Ryan's work laptop, arm64)
-- Clone: `~/git/zed`. `~/notes/projects/zed-fork/` has symlinks to `ci.sh`, `todo.md` and this file, plus `icon-options/`, which holds the icon exploration (`render.sh`, `render-k.sh`, `index.html`, `k.html`).
+- Clone: `~/git/zed`. `~/notes/projects/ryanzed/` has symlinks to `ci.sh`, `todo.md` and this file, plus `icon-options/`, which holds the icon exploration (`render.sh`, `render-k.sh`, `index.html`, `k.html`).
 - Full Xcode is installed at `/Applications/Xcode-*.app`, but `xcode-select` points at CommandLineTools, which lacks the Metal compiler. `ci.sh` sets `DEVELOPER_DIR` itself, so no sudo is needed.
 - rustup lives in `~/.cargo/bin`, which isn't on the shell PATH. `ci.sh` prepends it.
 - Shell quirks:
