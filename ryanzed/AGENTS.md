@@ -86,7 +86,7 @@ ryanzed/ci.sh --rollback home|mac
 - **Stages:**
   - **0, preflight:** branch, clean tree, Xcode, ssh master, free disk.
   - **1, sync:** only with `--sync`.
-  - **2, check:** `cargo fmt --check`, `cargo check -p zed`, then `cargo test` for each crate the fork touches.
+  - **2, check:** `cargo fmt --check`, `cargo check -p zed`, then one `cargo test -p …` for the crates changed since the last deployed `ryanzed/*` tag still in `HEAD`'s history (everything the fork touches after a `--sync` rebase). The test step is killed after `TEST_TIMEOUT` (15m), and the Mac gives up on the home build after `HOME_BUILD_TIMEOUT_MIN` (90) or when it exits without a status file. Upstream tests that assume update polling hang forever in RyanZed, so ignore those in a `fork:` commit.
   - **3, publish:** reuses a `ryanzed/*` tag already on HEAD or creates the next one, then `git push --force-with-lease origin patches` and pushes the tag.
   - **4, build and install.**
   - **5, verify:** `--version`. The home output shows the SHA; the Mac's doesn't, which is fine.
