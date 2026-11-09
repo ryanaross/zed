@@ -162,12 +162,13 @@ ssh home 'ps -eo args | awk "\$1 ~ /ryanzed\.app/" | wc -l'          # 0 = exite
 - Ryan's standing rules: commit and push in this repo only as part of a task he asked for, and never use his work identity. In `~/notes`, which isn't under git, ask before deleting anything.
 
 ## Status (2026-11-09)
-- Base `v1.27.0`. Both machines run `ryanzed/v1.27.0-7` (`cc50a83add`). All `todo.md` items are done.
-- Verified on home:
-  - SSH terminals running codex on flux resume after a restart: the active one at launch, the others when opened from the sidebar (`codex resume '<thread name>'`, read from the title).
+- Base `v1.27.0`. Both machines run `ryanzed/v1.27.0-8` (`0ce646893b`). All `todo.md` items are done.
+- Verified on home (`-7`/`-8`, driven through X11 with `~/.cache/rztest/` helpers):
+  - Plus button: opens one terminal with no menu, both for an open project and for one that wasn't open (it once opened two there; fixed in `-8`).
+  - Resume after a restart: codex over SSH (`codex resume '<thread name>'`), and local claude (`claude --resume <id>`) and pi (`pi --session <file>`). The active terminal resumes at launch; the others resume when opened. pi writes no session file until the first message, so a pi with no messages yet restarts fresh.
   - Thread history lists open and closed terminal threads above the ACP threads.
-- Verified earlier: side-by-side apps on both machines, state DB seeding, the icon, Linux-only `ci.sh`, `make-icon.sh` reproducibility.
-- Not yet exercised:
-  - Local (non-SSH) claude and pi resume, which go by session files. They are unit-tested only.
+  - Updates: the command palette has no "check for updates" command, and the log shows no update polling.
+- Not verified:
+  - The Mac app, including the removed "Check for Updates" menu item, until it is restarted onto `-8`.
   - Remote claude resumes with `claude --continue` (latest session in the directory), not by id. Remote pi isn't detected.
   - `--sync` with no new tag, `--rollback`, and the `cargo fmt` failure path.
