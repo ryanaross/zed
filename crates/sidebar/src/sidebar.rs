@@ -2587,21 +2587,29 @@ impl Sidebar {
             .map(|mw| mw.read(cx).workspaces_for_project_group(key, cx))
             .unwrap_or_default();
 
-        if open_workspaces.is_empty() {
+        // fork: the plus always opens a new terminal in this project, without the
+        // "New Thread In…" menu.
+        const PLUS_OPENS_TERMINAL: bool = true;
+        if PLUS_OPENS_TERMINAL || open_workspaces.is_empty() {
             let key = key.clone();
             return button
                 .tooltip(move |_, cx| {
-                    Tooltip::for_action_in("Start New Agent Thread", &NewThread, &focus_handle, cx)
+                    Tooltip::for_action_in("New Terminal", &NewTerminalThread, &focus_handle, cx)
                 })
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.set_group_expanded(&key, true, cx);
                     this.selection = None;
-                    if let Some(workspace) = this.workspace_for_group(&key, cx) {
-                        this.create_new_entry(&workspace, window, cx);
+                    let workspace = this
+                        .multi_workspace
+                        .upgrade()
+                        .and_then(|mw| mw.read(cx).last_active_workspace_for_group(&key, cx))
+                        .or_else(|| this.workspace_for_group(&key, cx));
+                    if let Some(workspace) = workspace {
+                        this.create_new_terminal(&workspace, window, cx);
                     } else {
                         this.open_workspace_and_create_entry(
                             &key,
-                            NewEntryTarget::LastCreatedKind,
+                            NewEntryTarget::Terminal,
                             window,
                             cx,
                         );
