@@ -162,17 +162,12 @@ ssh home 'ps -eo args | awk "\$1 ~ /ryanzed\.app/" | wc -l'          # 0 = exite
 - Ryan's standing rules: commit and push in this repo only as part of a task he asked for, and never use his work identity. In `~/notes`, which isn't under git, ask before deleting anything.
 
 ## Status (2026-11-09)
-- Base `v1.27.0`. `patches` is at `fork: ryanzed tooling`, and all four fork commits are authored by `ryanaross`.
-- Deployed: home runs `ryanzed/v1.27.0-4` (`5098fa0a21`, the tooling commit before the identity rewrite). The Mac runs `-3` (`22cae590db`, the icon commit before the rewrite). The code is identical apart from the tooling directory, and the next deploy tags the current head `-5`.
-- Verified:
-  - Both apps run side by side on both machines.
-  - The state DB was seeded from official Zed and the session restores.
-  - The K8 icon is in place.
-  - A Linux-only `ci.sh` deploy works.
-  - `make-icon.sh` output is pixel-identical to the committed icon.
+- Base `v1.27.0`. Both machines run `ryanzed/v1.27.0-7` (`cc50a83add`). All `todo.md` items are done.
+- Verified on home:
+  - SSH terminals running codex on flux resume after a restart: the active one at launch, the others when opened from the sidebar (`codex resume '<thread name>'`, read from the title).
+  - Thread history lists open and closed terminal threads above the ACP threads.
+- Verified earlier: side-by-side apps on both machines, state DB seeding, the icon, Linux-only `ci.sh`, `make-icon.sh` reproducibility.
 - Not yet exercised:
-  - `--sync` when there's no new tag (it should exit cleanly).
-  - `--rollback`.
-  - The `cargo fmt` failure path, which should stop at stage 2 before pushing.
-  - Confirming RyanZed never offers an update.
-- `todo.md` is still empty. Ryan writes the feature list next.
+  - Local (non-SSH) claude and pi resume, which go by session files. They are unit-tested only.
+  - Remote claude resumes with `claude --continue` (latest session in the directory), not by id. Remote pi isn't detected.
+  - `--sync` with no new tag, `--rollback`, and the `cargo fmt` failure path.
