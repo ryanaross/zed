@@ -4188,6 +4188,28 @@ impl Sidebar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // fork: terminal threads in history reopen as terminals and resume their agent.
+        if let Some(terminal) = agent_ui::ryanzed_resume::reopen_from_history(&metadata, cx) {
+            let path_list = terminal.folder_paths().clone();
+            let workspace = match self.find_current_workspace_for_path_list(
+                &path_list,
+                terminal.remote_connection.as_ref(),
+                cx,
+            ) {
+                Some(workspace) => ThreadEntryWorkspace::Open(workspace),
+                None => ThreadEntryWorkspace::Closed {
+                    project_group_key: ProjectGroupKey::from_worktree_paths(
+                        &terminal.worktree_paths,
+                        terminal.remote_connection.clone(),
+                    ),
+                    folder_paths: path_list,
+                },
+            };
+            self.show_thread_list(window, cx);
+            self.activate_terminal_entry(terminal, workspace, false, window, cx);
+            return;
+        }
+
         let thread_id = metadata.thread_id;
         let weak_archive_view = match &self.view {
             SidebarView::Archive(view) => Some(view.downgrade()),

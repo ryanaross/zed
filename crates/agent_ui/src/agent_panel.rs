@@ -2056,7 +2056,10 @@ impl AgentPanel {
         // as empty and spawning a second, "initial" terminal on activation.
         self.pending_terminal_spawn = Some(terminal_id);
         let terminal_working_directory = working_directory.clone();
-        let init_command = Self::terminal_init_command(run_init_command, cx);
+        let init_command = run_init_command
+            .then(|| crate::ryanzed_resume::resume_command(terminal_id, cx)) // fork
+            .flatten()
+            .or_else(|| Self::terminal_init_command(run_init_command, cx));
         let terminal_task = self.create_terminal_shell(working_directory, cx);
         let workspace = self.workspace.clone();
         let workspace_id = self.workspace_id;
@@ -2332,6 +2335,7 @@ impl AgentPanel {
             self.pending_terminal_spawn = None;
         }
         self.dismiss_terminal_notifications(terminal_id, cx);
+        let closing_metadata = self.terminal_metadata(terminal_id, cx); // fork
         if self.terminals.remove(&terminal_id).is_none() {
             return;
         }
@@ -2340,6 +2344,7 @@ impl AgentPanel {
                 store.delete(terminal_id, cx);
             });
         }
+        crate::ryanzed_resume::on_terminal_closed(terminal_id, closing_metadata, cx); // fork
         if was_active {
             self.base_view = BaseView::Uninitialized;
             self.refresh_base_view_subscriptions(window, cx);
@@ -2396,6 +2401,8 @@ impl AgentPanel {
     ) {
         if let Some(terminal) = self.terminals.get_mut(&terminal_id) {
             terminal.report_started_terminal_program(terminal_id, source, cx);
+            let terminal = terminal.view.read(cx).terminal().clone(); // fork
+            crate::ryanzed_resume::observe(terminal_id, &terminal, cx);
         }
     }
 
