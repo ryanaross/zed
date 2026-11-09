@@ -1,33 +1,75 @@
 # RyanZed: fork notes for agents and humans
 
-RyanZed is Ryan Ross's personal fork of Zed, [ryanaross/zed](https://github.com/ryanaross/zed). It adds personal features and installs **next to** official Zed. Everything needed to build, deploy and maintain it is in this `ryanzed/` directory. Upstream never touches this directory, so it can't conflict on a rebase. It must be possible to run the fork from a single Linux machine, with no Mac involved.
+RyanZed is the personal fork of Zed kept by Ryan (GitHub `ryanaross`), at [ryanaross/zed](https://github.com/ryanaross/zed). It adds personal features while still taking upstream releases, and it installs **next to** official Zed instead of replacing it. Everything needed to build, deploy and maintain it is in this `ryanzed/` directory. Upstream never touches this directory, so it can't conflict on a rebase.
+
+This file is meant to be enough context on its own. Read all of it before changing, building or deploying anything.
+
+## Decisions (and why)
+- **Fork model: a patch stack rebased onto upstream stable tags.** No merges. Each feature stays a single reviewable commit that could later go upstream as a PR, and upgrading is one rebase.
+- **Side by side, not a replacement.** Official Zed stays installed and keeps auto-updating. RyanZed has its own identity: app ID, state DB, single-instance channel and icon.
+- **Settings, keymaps, themes and extensions are shared** with official Zed, so one config drives both. Any fork-only setting key just shows a harmless "unknown key" warning in official Zed.
+- **No auto-update in RyanZed.** Updates arrive only through `ryanzed/ci.sh`.
+- **Must work with Linux alone.** If the Mac disappears, the `home` Linux desktop can build, tag, push and install by itself. This was proven on 2026-11-09: `ryanzed/v1.27.0-4` was deployed with `ci.sh` running on home.
+- **Git identity for this repo is `ryanaross <7442411+ryanaross@users.noreply.github.com>`**, set repo-local in every clone. Never commit here with a work (Unity) identity; the history was rewritten once to remove it.
 
 ## Branch model
-- `patches` (GitHub default) is upstream's newest stable tag (`vX.Y.Z`) plus a short linear stack of `fork:` commits. `git log --oneline $(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*')..patches` lists the stack.
-- Upgrade by **rebasing** onto the newer tag (`ryanzed/ci.sh --sync`). Never merge upstream. Turn `git config rerere.enabled true` on in every clone, so a conflict resolved once is replayed automatically.
-- Each deploy is tagged `ryanzed/<upstream-tag>-<n>`. `main` only mirrors upstream.
-- Remotes: `origin` is `git@github.com:ryanaross/zed.git`; `upstream` is `https://github.com/zed-industries/zed.git`.
+- `patches` (the GitHub default branch) is upstream's newest stable tag (`vX.Y.Z`) plus a short linear stack of `fork:` commits. To list the stack: `git log --oneline $(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*')..patches`.
+- To upgrade, **rebase** onto the newer tag with `ryanzed/ci.sh --sync`. Never merge upstream. Turn `git config rerere.enabled true` on in every clone, so a conflict resolved once is replayed automatically.
+- Each deploy is tagged `ryanzed/<upstream-tag>-<n>`. An old tag can point at a commit that is no longer on `patches` after a history rewrite. That's expected: the tag still matches the SHA compiled into that build.
+- `main` only mirrors upstream and never gets commits.
+- Remotes: `origin` is `git@github.com:ryanaross/zed.git` (use ssh; `gh` is also authenticated on both machines). `upstream` is `https://github.com/zed-industries/zed.git`.
 
 ## The fork stack (keep each commit small, it is replayed every release)
 | Commit | Hook points in upstream files |
 |---|---|
-| `fork: rebrand as RyanZed` | `crates/release_channel/src/lib.rs`: Stable `display_name` "RyanZed", `app_id` `dev.ryanaross.RyanZed`, `poll_for_updates()` false (no auto-update). `crates/db/src/db.rs`: stable DB scope `ryanzed-stable`. `crates/zed/src/zed/open_listener.rs`: Linux socket `ryanzed-<channel>.sock`. `crates/zed/Cargo.toml` `[package.metadata.bundle-stable]`: identifier and name. `script/bundle-linux`: stable `APP_NAME`/`APP_ID`. |
-| `fork: separate macOS single-instance port` | `crates/zed/src/zed/mac_only_instance.rs`: stable port `43737 + 5*USER_BLOCK` (official Zed uses `2*`) and its own handshake string. Without it, RyanZed exits with "zed is already running" while Zed is open. |
-| `fork: RyanZed icon` | `crates/zed/resources/app-icon-ryanzed{,@2x}.png` (made by `ryanzed/make-icon.sh`), `bundle-stable` `icon`, and `icon_suffix` in `script/bundle-linux`. |
-| `fork: ryanzed tooling` | This directory, plus a pointer appended to `.rules` (which `AGENTS.md`, `CLAUDE.md` and `GEMINI.md` symlink to). |
+| `fork: rebrand as RyanZed` | `crates/release_channel/src/lib.rs`: Stable `display_name` "RyanZed", `app_id` `dev.ryanaross.RyanZed`, and `poll_for_updates()` returns false (no auto-update or manual check). `crates/db/src/db.rs`: the stable DB scope is `ryanzed-stable`. `crates/zed/src/zed/open_listener.rs`: the Linux socket is `ryanzed-<channel>.sock`. `crates/zed/Cargo.toml` `[package.metadata.bundle-stable]`: identifier and name. `script/bundle-linux`: the stable `APP_NAME`/`APP_ID`. |
+| `fork: separate macOS single-instance port for RyanZed` | `crates/zed/src/zed/mac_only_instance.rs`: the stable port is `43737 + 5*USER_BLOCK` (official Zed uses `2*`), with its own handshake string. Without it, RyanZed exits with "zed is already running" while official Zed is open. |
+| `fork: RyanZed icon` | `crates/zed/resources/app-icon-ryanzed{,@2x}.png` (generated by `ryanzed/make-icon.sh`), the `bundle-stable` `icon`, and `icon_suffix` in `script/bundle-linux`. |
+| `fork: ryanzed tooling` | This directory, plus a pointer appended to `.rules`, which upstream's `AGENTS.md`, `CLAUDE.md` and `GEMINI.md` all symlink to. |
 
-Look for `// fork:` / `# fork:` comments to find every hook. When a rebase conflicts, keep upstream's change and re-apply the fork's one-line intent.
+Every hook is marked with a `// fork:` or `# fork:` comment. When a rebase conflicts, keep upstream's change and re-apply the fork's one-line intent. Don't rename `paths::APP_NAME` (it's what keeps config shared), and don't touch the `zed://` URL scheme (about 20 call sites).
 
 ### What is shared with official Zed and what is separate
 | | Official Zed | RyanZed |
 |---|---|---|
-| App ID / bundle | `dev.zed.Zed` | `dev.ryanaross.RyanZed` |
-| State DB (workspaces, sessions) | `<data>/db/0-stable` | `<data>/db/0-ryanzed-stable` |
-| Single instance | `zed-stable.sock` (Linux), port 43937+uid (Mac) | `ryanzed-stable.sock`, port 44237+uid |
-| Settings, keymap, themes, extensions, prompts, threads | shared: `~/.config/zed` and `<data>` | shared |
-| `zed://` URL scheme | registered | shared on Mac; not registered on Linux |
+| App ID / bundle | `dev.zed.Zed`, `Zed.app` | `dev.ryanaross.RyanZed`, `RyanZed.app` |
+| State DB (workspaces, sessions, window layout) | `<data>/db/0-stable` | `<data>/db/0-ryanzed-stable` |
+| Single instance | `zed-stable.sock` (Linux), TCP port 43937+uid (Mac) | `ryanzed-stable.sock`, port 44237+uid |
+| Settings, keymap, themes, extensions, prompts, agent threads, `0-global` DB | `~/.config/zed` and `<data>` | shared |
+| `zed://` URL scheme | registered | shared on Mac (the last app registered wins); not registered on Linux |
+| Icon | stock black | ocean blue with a teal "R" badge (option "K8") |
 
-`<data>` is `~/.local/share/zed` on Linux and `~/Library/Application Support/Zed` on the Mac. To start RyanZed from official Zed's state, quit RyanZed, then take a SQLite backup of `0-stable/db.sqlite` into `0-ryanzed-stable/db.sqlite`. This is safe while Zed runs. Without `sqlite3`, use Python's `sqlite3.Connection.backup`.
+`<data>` is `~/.local/share/zed` on Linux and `~/Library/Application Support/Zed` on the Mac.
+
+**Seeding RyanZed's state from official Zed** (already done once on both machines):
+1. Quit RyanZed. If it's running, it keeps writing to the old file.
+2. Back up `0-stable/db.sqlite` into `0-ryanzed-stable/db.sqlite`. This is safe while official Zed runs:
+   - With `sqlite3`: `sqlite3 0-stable/db.sqlite ".backup '0-ryanzed-stable/db.sqlite'"`.
+   - Home has no `sqlite3`, so use Python's `sqlite3.Connection.backup` there.
+
+Move any existing `0-ryanzed-stable` aside before seeding; don't delete it.
+
+## Machines
+### Mac (Ryan's work laptop, arm64)
+- Clone: `~/git/zed`. `~/notes/projects/zed-fork/` has symlinks to `ci.sh`, `todo.md` and this file, plus `icon-options/`, which holds the icon exploration (`render.sh`, `render-k.sh`, `index.html`, `k.html`).
+- Full Xcode is installed at `/Applications/Xcode-*.app`, but `xcode-select` points at CommandLineTools, which lacks the Metal compiler. `ci.sh` sets `DEVELOPER_DIR` itself, so no sudo is needed.
+- rustup lives in `~/.cargo/bin`, which isn't on the shell PATH. `ci.sh` prepends it.
+- Shell quirks:
+  - zsh: quote globs like `--include=*.rs`.
+  - GNU sed is on PATH, so `sed -i ''` fails. Use `perl -pi`.
+  - `/bin/bash` is 3.2, so no associative arrays.
+- ImageMagick 7 is installed (`magick`).
+- Installs to `/Applications/RyanZed.app`, keeping the previous build as `RyanZed.prev.app`. The CLI is linked at `/opt/homebrew/bin/ryanzed`.
+
+### home (Linux desktop)
+- Host `ryross-desktop`, user `ryross`: Linux Mint 22.3 (Ubuntu 24.04 base), x86_64, 16 cores, 31 GB RAM, GTX 1060.
+- Desktop: GNOME on **X11, `DISPLAY=:1`**, with `XAUTHORITY=/run/user/1000/gdm/Xauthority`.
+- From the Mac, it's `ssh home` (LAN only). The connection uses an ssh ControlMaster: Ryan has to authenticate once with `! ssh home` in Claude Code, which lasts about 30 minutes idle. `ci.sh` stops if there's no master.
+- Storage: `/` has about 22 GB free, too small to build on. The clone **and `target/`** live on `/mnt/data/build/zed` (ext4 SSD), and `ci.sh` requires 60 GB or more free there. Build logs from Mac-driven runs go to `/mnt/data/build/logs/<sha>.{log,status}`.
+- Official Zed and Zed Preview are installed in `~/.local/zed.app` and `~/.local/zed.preview.app`, launched through `~/.local/bin/zed-safe`. That wrapper sets `ZED_FILE_WATCHER_MODE=native` to fix file watching on SMB mounts, and the RyanZed launcher does the same.
+- RyanZed installs to `~/.local/ryanzed.app` (previous build in `ryanzed.prev.app`), with the launcher at `~/.local/bin/ryanzed` and the desktop entry `~/.local/share/applications/dev.ryanaross.RyanZed.desktop` (`StartupWMClass=dev.ryanaross.RyanZed`).
+- Installed tools: rustup, the build dependencies from `script/linux`, python3, wmctrl, fc-match. Not installed: `sqlite3`, ImageMagick (`apt install imagemagick` gives IM6's `convert`, which `make-icon.sh` accepts).
+- `script/linux` needs sudo and a real TTY. Ryan has to run it in his own terminal; `! ssh -t` from Claude Code has no TTY.
 
 ## Build and deploy: `ryanzed/ci.sh`
 ```
@@ -37,35 +79,97 @@ ryanzed/ci.sh --only home|mac
 ryanzed/ci.sh --skip-tests | --skip-checks
 ryanzed/ci.sh --rollback home|mac
 ```
-- It requires a clean checkout on `patches`. It runs from a temp copy of itself, so `--sync` can rebase it safely. Logs go to `~/.local/state/ryanzed/logs/`.
-- **On Linux** the `home` target builds in place with `ryanzed/install-linux.sh`. That script runs `script/bundle-linux`, then installs to `~/.local/ryanzed.app` (keeping the old build as `ryanzed.prev.app`), writes the `~/.local/bin/ryanzed` launcher, and writes the `dev.ryanaross.RyanZed.desktop` entry.
-- **On macOS** both targets run:
-  - `mac` uses `script/bundle-mac -i` to install `/Applications/RyanZed.app` (ad-hoc signed) and links the `ryanzed` CLI. `DEVELOPER_DIR` must point at full Xcode for the Metal compiler.
-  - `home` is built over `ssh home`, in `/mnt/data/build/zed`, as a detached job that the Mac polls.
-- `bundle-mac -i` exits non-zero after a successful install, because it tries to make a DMG of the bundle it just moved. ci.sh accepts that if the installed binary is new.
+- **Requirements:** a clean checkout on `patches`. It runs from a temp copy of itself, so `--sync` can rebase it safely. Logs go to `~/.local/state/ryanzed/logs/`.
+- **Stages:**
+  - **0, preflight:** branch, clean tree, Xcode, ssh master, free disk.
+  - **1, sync:** only with `--sync`.
+  - **2, check:** `cargo fmt --check`, `cargo check -p zed`, then `cargo test` for each crate the fork touches.
+  - **3, publish:** reuses a `ryanzed/*` tag already on HEAD or creates the next one, then `git push --force-with-lease origin patches` and pushes the tag.
+  - **4, build and install.**
+  - **5, verify:** `--version`. The home output shows the SHA; the Mac's doesn't, which is fine.
+- **On Linux,** the `home` target builds in place by running `ryanzed/install-linux.sh`. That script:
+  - runs `script/bundle-linux --skip-sentry`;
+  - extracts the tarball and swaps in the new app;
+  - writes the launcher and the desktop entry.
 
-## Linux-only operation (no Mac)
-The `home` desktop is `ryross-desktop`: Linux Mint 22.3, x86_64. `/` is small, so the repo and `target/` live on `/mnt/data/build/zed`, which needs 60 GB or more free. To deploy from it directly:
+  The `mac` target is skipped.
+- **On macOS,** both targets run:
+  - `mac` runs `script/bundle-mac -i`, which installs an ad-hoc signed app. Upstream bug: on release builds it then tries to make a DMG of the bundle it just moved and fails. `ci.sh` accepts that failure as long as the installed binary is newer than the start of the build.
+  - `home` runs over ssh. It needs home's clone to be clean, then checks out the SHA (detached) and runs `install-linux.sh` as a `setsid nohup` job. The Mac polls the status file every 30 seconds.
+  - Mac-driven runs leave home on a detached HEAD. Run `git checkout patches && git pull --ff-only` before working there.
+- **Build times:**
+  - First build: about 30 to 40 minutes on each machine.
+  - Incremental build: about 10 to 15 minutes. Every new commit recompiles the `zed` crate in release mode, because `ZED_COMMIT_SHA` is compiled in.
+  - Don't run two builds in the same clone at once; they fight over cargo's lock. Don't commit in a clone while it's building either: the SHA gets compiled in.
+- **Running a build in the background:** run it as a Claude Code background command and wait for its completion notification instead of polling.
+
+### Linux-only operation (no Mac)
 ```
 cd /mnt/data/build/zed
-git checkout patches && git pull --ff-only    # a Mac deploy leaves it on a detached SHA
-ryanzed/ci.sh                                 # mac target is skipped automatically on Linux
+git checkout patches && git pull --ff-only
+ryanzed/ci.sh                                 # mac target is skipped automatically
 ```
-Bootstrapping a fresh Linux machine:
+To bootstrap a fresh Linux machine:
 ```
 git clone git@github.com:ryanaross/zed.git && cd zed      # lands on patches
 git remote add upstream https://github.com/zed-industries/zed.git && git fetch upstream --tags
 git config rerere.enabled true
 git config user.name ryanaross && git config user.email 7442411+ryanaross@users.noreply.github.com
 curl https://sh.rustup.rs -sSf | sh -s -- -y              # rust-toolchain.toml pins the version
-script/linux                                               # system build deps (sudo)
+script/linux                                               # system build deps (sudo, real TTY)
 ryanzed/ci.sh --only home
 ```
-The launcher sets `ZED_FILE_WATCHER_MODE=native`, which fixes file watching on the SMB mounts; official Zed uses `~/.local/bin/zed-safe` for the same thing.
+On home itself the clone must stay on `/mnt/data`.
+
+## Testing a deploy: launch and close
+### Mac
+```
+open -a /Applications/RyanZed.app
+osascript -e 'tell application "System Events" to tell (first process whose bundle identifier is "dev.ryanaross.RyanZed") to get name of windows'
+osascript -e 'tell application id "dev.ryanaross.RyanZed" to quit'
+lsof -nP -iTCP:44438 -iTCP:44738 -sTCP:LISTEN   # official Zed holds 44438 and RyanZed 44738 (uid 501)
+killall Dock                                   # if the Dock still shows a cached old icon
+```
+### home (over ssh, into Ryan's X session)
+```
+ssh home 'export DISPLAY=:1 XAUTHORITY=/run/user/1000/gdm/Xauthority DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000
+  setsid nohup ~/.local/bin/ryanzed >/tmp/ryanzed-launch.log 2>&1 </dev/null &
+  sleep 10; wmctrl -lx | grep dev.ryanaross.RyanZed'                  # window exists
+ssh home 'export DISPLAY=:1 XAUTHORITY=/run/user/1000/gdm/Xauthority
+  for id in $(wmctrl -lx | awk "/dev.ryanaross.RyanZed/{print \$1}"); do wmctrl -ic $id; done'   # graceful close
+ssh home 'ps -eo args | awk "\$1 ~ /ryanzed\.app/" | wc -l'          # 0 = exited
+```
+**Process checks:** `pgrep -f <path>` also matches the shell running the check, whose command line contains the same string, so it reports false positives. Match the process's own executable instead, for example `ps -axo comm=` on the Mac or the `awk '$1 ~ …'` above.
+
+## Gotchas found the hard way
+- **On macOS, single-instance is a TCP port, not a socket.** Any new identity work has to cover both `open_listener.rs` (Linux) and `mac_only_instance.rs` (Mac).
+- **Swapping the state DB under a running RyanZed doesn't work.** The app keeps writing to the moved-aside file.
+- **Upstream's `.rules` is the root `AGENTS.md`/`CLAUDE.md`.** The fork adds only one short pointer at its end, which keeps rebase conflicts unlikely.
+- **Claude Code's auto-mode classifier blocks history rewrites** (`commit --amend`, force-push of rewritten history) unless Ryan asks for them explicitly. Prefer a new `fork:` commit; ask before rewriting.
 
 ## Adding a feature
-- Features are listed in `ryanzed/todo.md`.
+- Ryan lists features in `ryanzed/todo.md`. Commit edits to it in the fork.
 - Prefer an extension, a setting or a keymap change. Fork code only for what those can't do.
-- One `fork: <feature>` commit per feature. Put new code in new files or modules, and keep the hooks into upstream files thin and marked `// fork:`. Put new behaviour behind a setting, so it stays dormant by default.
-- Follow upstream's Rust guidelines in `.rules`.
-- Deploy only through `ryanzed/ci.sh`.
+- One `fork: <feature>` commit per feature:
+  - Put new code in new files or modules.
+  - Keep the hooks into upstream files thin and marked `// fork:`.
+  - Put new behaviour behind a setting, so it stays dormant by default.
+- Follow upstream's Rust guidelines in `.rules`. Run `cargo fmt` and the touched crates' tests; `ci.sh` does both.
+- Deploy only through `ryanzed/ci.sh`, normally to both targets. Then launch and close RyanZed on each machine (see above) to confirm it starts.
+- Ryan's standing rules: commit and push in this repo only as part of a task he asked for, and never use his work identity. In `~/notes`, which isn't under git, ask before deleting anything.
+
+## Status (2026-11-09)
+- Base `v1.27.0`. `patches` is at `fork: ryanzed tooling`, and all four fork commits are authored by `ryanaross`.
+- Deployed: home runs `ryanzed/v1.27.0-4` (`5098fa0a21`, the tooling commit before the identity rewrite). The Mac runs `-3` (`22cae590db`, the icon commit before the rewrite). The code is identical apart from the tooling directory, and the next deploy tags the current head `-5`.
+- Verified:
+  - Both apps run side by side on both machines.
+  - The state DB was seeded from official Zed and the session restores.
+  - The K8 icon is in place.
+  - A Linux-only `ci.sh` deploy works.
+  - `make-icon.sh` output is pixel-identical to the committed icon.
+- Not yet exercised:
+  - `--sync` when there's no new tag (it should exit cleanly).
+  - `--rollback`.
+  - The `cargo fmt` failure path, which should stop at stage 2 before pushing.
+  - Confirming RyanZed never offers an update.
+- `todo.md` is still empty. Ryan writes the feature list next.
