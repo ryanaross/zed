@@ -28,6 +28,9 @@ REMOTE_LOGS=/mnt/data/build/logs
 MIN_FREE_GB=60
 TEST_TIMEOUT=15m           # whole cargo test step
 HOME_BUILD_TIMEOUT_MIN=90  # home build from the Mac
+# Stable local code-signing identity: an ad-hoc signature changes every build, and
+# macOS then treats each build as a new app and asks for keychain access again.
+MAC_SIGN_IDENTITY="${RYANZED_SIGN_IDENTITY:-Meeting Recorder Local}"
 LOG_DIR="${RYANZED_LOG_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/ryanzed/logs}"
 
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -188,6 +191,12 @@ if want mac; then
   script/bundle-mac -i || [[ /Applications/RyanZed.app/Contents/MacOS/zed -nt "$marker" ]] \
     || die "bundle-mac failed before installing"
   rm -f "$marker"
+  if security find-identity -v -p codesigning | grep -qF "\"$MAC_SIGN_IDENTITY\""; then
+    codesign --force --deep --preserve-metadata=entitlements -s "$MAC_SIGN_IDENTITY" /Applications/RyanZed.app \
+      || die "re-signing with $MAC_SIGN_IDENTITY failed"
+  else
+    echo "note: no '$MAC_SIGN_IDENTITY' signing identity; keeping the ad-hoc signature (keychain will re-prompt)"
+  fi
   ln -sf /Applications/RyanZed.app/Contents/MacOS/cli /opt/homebrew/bin/ryanzed
 fi
 
