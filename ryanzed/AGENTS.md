@@ -67,7 +67,7 @@ Move any existing `0-ryanzed-stable` aside before seeding; don't delete it.
 - From the Mac, it's `ssh home` (LAN only). The connection uses an ssh ControlMaster: Ryan has to authenticate once with `! ssh home` in Claude Code, which lasts about 30 minutes idle. `ci.sh` stops if there's no master.
 - Storage: `/` has about 22 GB free, too small to build on. The clone **and `target/`** live on `/mnt/data/build/zed` (ext4 SSD), and `ci.sh` requires 60 GB or more free there. Build logs from Mac-driven runs go to `/mnt/data/build/logs/<sha>.{log,status}`.
 - Official Zed and Zed Preview are installed in `~/.local/zed.app` and `~/.local/zed.preview.app`, launched through `~/.local/bin/zed-safe`. That wrapper sets `ZED_FILE_WATCHER_MODE=native` to fix file watching on SMB mounts, and the RyanZed launcher does the same.
-- RyanZed installs to `~/.local/ryanzed.app` (previous build in `ryanzed.prev.app`), with the launcher at `~/.local/bin/ryanzed` and the desktop entry `~/.local/share/applications/dev.ryanaross.RyanZed.desktop` (`StartupWMClass=dev.ryanaross.RyanZed`).
+- RyanZed installs to `~/.local/ryanzed.app` (previous build in `ryanzed.prev.app`), with the launcher at `~/.local/bin/ryanzed` and the desktop entry `~/.local/share/applications/dev.ryanaross.RyanZed.desktop` (`StartupWMClass=dev.ryanaross.RyanZed`), plus a trusted desktop shortcut `~/Desktop/RyanZed.desktop`.
 - Installed tools: rustup, the build dependencies from `script/linux`, python3, wmctrl, fc-match. Not installed: `sqlite3`, ImageMagick (`apt install imagemagick` gives IM6's `convert`, which `make-icon.sh` accepts).
 - `script/linux` needs sudo and a real TTY. Ryan has to run it in his own terminal; `! ssh -t` from Claude Code has no TTY.
 
@@ -90,7 +90,7 @@ ryanzed/ci.sh --rollback home|mac
 - **On Linux,** the `home` target builds in place by running `ryanzed/install-linux.sh`. That script:
   - runs `script/bundle-linux --skip-sentry`;
   - extracts the tarball and swaps in the new app;
-  - writes the launcher and the desktop entry.
+  - writes the launcher and the desktop entry and desktop shortcut.
 
   The `mac` target is skipped.
 - **On macOS,** both targets run:
