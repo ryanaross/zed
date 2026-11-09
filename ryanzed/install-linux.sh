@@ -3,6 +3,7 @@
 #   ~/.local/ryanzed.app          the app (previous build kept as ryanzed.prev.app)
 #   ~/.local/bin/ryanzed          launcher
 #   ~/.local/share/applications/dev.ryanaross.RyanZed.desktop
+#   ~/Desktop/RyanZed.desktop     desktop shortcut (marked trusted)
 # Builds whatever is checked out; ci.sh checks out the tagged SHA first.
 set -euo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -47,4 +48,13 @@ Exec=$HOME/.local/bin/ryanzed --new %U
 Name=Open a new workspace
 DESKTOP
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
+
+# Desktop shortcut. GNOME's desktop-icons extension (DING) only launches it when it is
+# executable and marked trusted; gio needs the session bus, which an ssh shell lacks.
+desk="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+if [ -d "$desk" ]; then
+  install -m 755 ~/.local/share/applications/dev.ryanaross.RyanZed.desktop "$desk/RyanZed.desktop"
+  [ -S "/run/user/$(id -u)/bus" ] && export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
+  gio set "$desk/RyanZed.desktop" metadata::trusted true 2>/dev/null || echo "note: right-click RyanZed on the desktop > Allow Launching"
+fi
 echo "installed ~/.local/ryanzed.app"
