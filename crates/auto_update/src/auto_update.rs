@@ -265,8 +265,11 @@ struct GlobalAutoUpdate(Option<Entity<AutoUpdater>>);
 impl Global for GlobalAutoUpdate {}
 
 pub fn init(client: Arc<Client>, cx: &mut App) {
-    cx.observe_new(|workspace: &mut Workspace, _window, _cx| {
-        workspace.register_action(|_, action, window, cx| check(action, window, cx));
+    cx.observe_new(|workspace: &mut Workspace, _window, cx| {
+        // fork: no update checks at all, so no "auto update: check" command either.
+        if ReleaseChannel::try_global(cx).is_some_and(|channel| channel.poll_for_updates()) {
+            workspace.register_action(|_, action, window, cx| check(action, window, cx));
+        }
 
         workspace.register_action(|_, action, _, cx| {
             view_release_notes(action, cx);
