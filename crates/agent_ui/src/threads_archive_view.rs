@@ -287,6 +287,7 @@ impl ThreadsArchiveView {
                 ThreadFilter::All => true,
                 ThreadFilter::ArchivedOnly => t.archived,
             })
+            .filter(|t| !t.is_draft()) // fork: empty drafts are all "New Agent Thread"
             .sorted_by_cached_key(|t| t.created_at.unwrap_or(t.updated_at))
             .rev()
             .cloned()
@@ -637,6 +638,8 @@ impl ThreadsArchiveView {
 
                 let icon = if thread.agent_id.as_ref() == agent::ZED_AGENT_ID.as_ref() {
                     IconName::ZedAgent
+                } else if crate::ryanzed_resume::is_terminal_history(&thread.agent_id) {
+                    IconName::Terminal // fork
                 } else {
                     IconName::Sparkle
                 };
@@ -818,6 +821,10 @@ impl ThreadsArchiveView {
         agent: AgentId,
         cx: &mut Context<Self>,
     ) {
+        // fork: terminal history rows have no agent server behind them.
+        if crate::ryanzed_resume::delete_history(thread_id, session_id.as_ref(), &agent, cx) {
+            return;
+        }
         ThreadMetadataStore::global(cx).update(cx, |store, cx| store.delete(thread_id, cx));
 
         let agent = Agent::from(agent);
