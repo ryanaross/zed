@@ -945,8 +945,9 @@ mod linux {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| paths::data_dir().clone());
 
+            // fork: must match the app's listener in `open_listener.rs`.
             let sock_path = data_dir.join(format!(
-                "zed-{}.sock",
+                "ryanzed-{}.sock",
                 *release_channel::RELEASE_CHANNEL_NAME
             ));
             let sock = UnixDatagram::unbound()?;
