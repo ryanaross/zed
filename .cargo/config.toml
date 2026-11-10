@@ -1,6 +1,7 @@
 [target.'cfg(all())']
 # v0 mangling scheme provides more detailed backtraces around closures
-rustflags = ["-C", "symbol-mangling-version=v0", "--cfg", "tokio_unstable"]
+# fork: ryanzed_slim compiles out LiveKit/WebRTC calls and the Bedrock provider.
+rustflags = ["-C", "symbol-mangling-version=v0", "--cfg", "tokio_unstable", "--cfg", "ryanzed_slim"]
 
 [alias]
 xtask = "run --package xtask --"

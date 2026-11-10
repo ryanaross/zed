@@ -310,7 +310,8 @@ fn compute_network_stats(stats: &livekit_client::SessionStats) -> ComputedNetwor
         test,
         feature = "test-support",
         all(target_os = "windows", target_env = "gnu"),
-        target_os = "freebsd"
+        target_os = "freebsd",
+        ryanzed_slim // fork: slim build, no LiveKit/WebRTC
     )
 ))]
 fn compute_remote_audio_stats(
@@ -330,7 +331,8 @@ fn compute_remote_audio_stats(
         test,
         feature = "test-support",
         all(target_os = "windows", target_env = "gnu"),
-        target_os = "freebsd"
+        target_os = "freebsd",
+        ryanzed_slim // fork: slim build, no LiveKit/WebRTC
     ))
 ))]
 fn compute_remote_audio_stats(
@@ -463,7 +465,8 @@ fn compute_remote_audio_stats(
         test,
         feature = "test-support",
         all(target_os = "windows", target_env = "gnu"),
-        target_os = "freebsd"
+        target_os = "freebsd",
+        ryanzed_slim // fork: slim build, no LiveKit/WebRTC
     )
 ))]
 fn extract_metrics(
@@ -481,7 +484,8 @@ fn extract_metrics(
         test,
         feature = "test-support",
         all(target_os = "windows", target_env = "gnu"),
-        target_os = "freebsd"
+        target_os = "freebsd",
+        ryanzed_slim // fork: slim build, no LiveKit/WebRTC
     ))
 ))]
 fn extract_metrics(
