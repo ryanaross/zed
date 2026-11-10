@@ -2609,7 +2609,7 @@ impl Terminal {
         cx: &mut Context<Self>,
     ) {
         if self.selection_phase == SelectionPhase::Selecting
-            || !modifiers.secondary(cx)
+            || !link_modifier_held(&modifiers, cx)
             || !self.last_content.terminal_bounds.bounds.contains(&position)
         {
             self.clear_hyperlink(cx);
@@ -2743,7 +2743,7 @@ impl Terminal {
         );
 
         if e.button == MouseButton::Left
-            && e.modifiers.secondary(cx)
+            && link_modifier_held(&e.modifiers, cx)
             && (TerminalSettings::get_global(cx).open_links_in_mouse_mode
                 || !self.mouse_mode(e.modifiers.shift, mode))
         {
@@ -2877,7 +2877,7 @@ impl Terminal {
                     .and_then(|cell| cell.hyperlink())
                 {
                     cx.open_url(link.uri());
-                } else if e.modifiers.secondary(cx) {
+                } else if link_modifier_held(&e.modifiers, cx) {
                     self.events
                         .push_back(InternalEvent::FindHyperlink(position, true));
                 }
@@ -3657,6 +3657,13 @@ pub fn rgba_color(r: u8, g: u8, b: u8) -> Hsla {
         a: 1.,
     }
     .into()
+}
+
+/// fork: links open with the platform's secondary modifier (cmd on macOS, ctrl elsewhere)
+/// or, off macOS, also with super, so a Mac keyboard shared to Linux (cmd arrives as
+/// super) opens links the same way on both.
+pub fn link_modifier_held(modifiers: &Modifiers, cx: &App) -> bool {
+    modifiers.secondary(cx) || modifiers.platform
 }
 
 #[cfg(test)]
