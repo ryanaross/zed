@@ -1609,7 +1609,11 @@ impl Sidebar {
                 continue;
             }
 
-            let label = group_key.display_name(&path_detail_map);
+            let mut label = group_key.display_name(&path_detail_map);
+            // fork: remote project names show their host, e.g. "frigate (192.168.88.69)".
+            if let Some(host) = group_key.host() {
+                label = format!("{label} ({})", host.display_name()).into();
+            }
 
             let is_collapsed = self.is_group_collapsed(group_key, cx);
             let should_load_threads = !is_collapsed || !query.is_empty();

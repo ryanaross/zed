@@ -171,9 +171,10 @@ fn assert_remote_project_integration_sidebar_state(
     let Some(project_header) = project_headers.next() else {
         panic!("expected exactly one sidebar project header named `project`, found none");
     };
-    assert_eq!(
-        project_header, "project",
-        "expected the only sidebar project header to be `project`"
+    // fork: remote project names show their host.
+    assert!(
+        project_header.starts_with("project (mock-"),
+        "expected the only sidebar project header to be `project (<host>)`, got `{project_header}`"
     );
     if let Some(unexpected_header) = project_headers.next() {
         panic!(
@@ -186,10 +187,10 @@ fn assert_remote_project_integration_sidebar_state(
     for entry in &sidebar.contents.entries {
         match entry {
             ListEntry::ProjectHeader { label, .. } => {
-                assert_eq!(
-                    label.as_ref(),
-                    "project",
-                    "expected the only sidebar project header to be `project`"
+                // fork: remote project names show their host.
+                assert!(
+                    label.starts_with("project (mock-"),
+                    "expected the only sidebar project header to be `project (<host>)`"
                 );
             }
             ListEntry::Thread(thread)
@@ -14378,7 +14379,9 @@ async fn test_remote_project_integration_does_not_briefly_render_as_separate_pro
                     return;
                 };
 
-                if project_header != "project" || project_headers.next().is_some() {
+                // fork: remote project names show their host.
+                if !project_header.starts_with("project (mock-") || project_headers.next().is_some()
+                {
                     saw_separate_project_header_for_observer
                         .store(true, std::sync::atomic::Ordering::SeqCst);
                 }
