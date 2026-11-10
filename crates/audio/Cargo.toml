@@ -29,5 +29,6 @@ util.workspace = true
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 
-[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))'.dependencies]
+# fork: slim build (ryanzed_slim is set in .cargo/config.toml)
+[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", ryanzed_slim)))'.dependencies]
 libwebrtc.workspace = true
