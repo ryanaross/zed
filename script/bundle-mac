@@ -114,7 +114,8 @@ else
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-cargo --config .cargo/bundle-config.toml build ${build_flag} ${remote_server_features} --package remote_server --target $target_triple
+# fork: RyanZed downloads the official remote server, so ci.sh skips building one.
+[[ -n "${RYANZED_SKIP_REMOTE_SERVER:-}" ]] || cargo --config .cargo/bundle-config.toml build ${build_flag} ${remote_server_features} --package remote_server --target $target_triple
 
 echo "Creating application bundle"
 pushd crates/zed
@@ -376,5 +377,7 @@ cp target/${target_triple}/${target_dir}/zed "${app_path}/Contents/MacOS/zed"
 cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
 sign_app_binaries
 
+if [[ -z "${RYANZED_SKIP_REMOTE_SERVER:-}" ]]; then
 sign_binary "target/$target_triple/release/remote_server"
 gzip -f --stdout --best target/$target_triple/release/remote_server > target/zed-remote-server-macos-$arch_suffix.gz
+fi

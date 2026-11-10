@@ -188,6 +188,8 @@ if want mac; then
   fi
   marker="$(mktemp)"
   # bundle-mac -i installs the app, then (upstream bug) tries to DMG the moved bundle and fails.
+  # shellcheck source=build-env.sh
+  source ryanzed/build-env.sh
   script/bundle-mac -i || [[ /Applications/RyanZed.app/Contents/MacOS/zed -nt "$marker" ]] \
     || die "bundle-mac failed before installing"
   rm -f "$marker"
