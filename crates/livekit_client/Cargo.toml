@@ -43,16 +43,19 @@ smallvec.workspace = true
 ui.workspace = true
 util.workspace = true
 
-[target.'cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd"))'.dependencies]
+# fork: slim build (ryanzed_slim is set in .cargo/config.toml)
+[target.'cfg(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", ryanzed_slim))'.dependencies]
 livekit_api.workspace = true
 nanoid.workspace = true
 postage = { workspace = true, features = ["futures-traits", "logging", "blocking"] }
 
-[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd")))'.dependencies]
+# fork: slim build (ryanzed_slim is set in .cargo/config.toml)
+[target.'cfg(not(any(all(target_os = "windows", target_env = "gnu"), target_os = "freebsd", ryanzed_slim)))'.dependencies]
 libwebrtc.workspace = true
 livekit.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
+# fork: slim build (ryanzed_slim is set in .cargo/config.toml)
+[target.'cfg(all(target_os = "linux", not(ryanzed_slim)))'.dependencies]
 tokio = { workspace = true, features = ["time"] }
 webrtc-sys.workspace = true
 

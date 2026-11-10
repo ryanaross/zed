@@ -6302,6 +6302,7 @@ mod tests {
                 all_namespaces,
                 expected_namespaces
                     .into_iter()
+                    .filter(|namespace| !(cfg!(ryanzed_slim) && *namespace == "bedrock")) // fork: slim build
                     .map(|namespace| namespace.to_string())
                     .sorted()
                     .collect::<Vec<_>>()
