@@ -164,7 +164,8 @@ ssh home 'ps -eo args | awk "\$1 ~ /ryanzed\.app/" | wc -l'          # 0 = exite
 - Ryan's standing rules: commit and push in this repo only as part of a task he asked for, and never use his work identity. In `~/notes`, which isn't under git, ask before deleting anything.
 
 ## Status (2026-11-09)
-- Base `v1.27.0`. Both machines run `ryanzed/v1.27.0-9` (`19d507ab32`). All `todo.md` items are done.
+- Base `v1.27.0`. Both machines run `ryanzed/v1.27.0-10` (`467c67694b`, slim build and fast bundles). All `todo.md` items are done.
+- Build times (`-10`): a cold rebuild after a cfg or profile change takes about 12 min on the Mac and 10 on home. Upstream's profile took 15 min clean on home, with 5 min of that in the final single-threaded `zed` crate. `remote_server` is no longer built.
 - Verified on home (`-7`/`-8`, driven through X11 with `~/.cache/rztest/` helpers):
   - Plus button: opens one terminal with no menu, both for an open project and for one that wasn't open (it once opened two there; fixed in `-8`).
   - Resume after a restart: codex over SSH (`codex resume '<thread name>'`), and local claude (`claude --resume <id>`) and pi (`pi --session <file>`). The active terminal resumes at launch; the others resume when opened. pi writes no session file until the first message, so a pi with no messages yet restarts fresh.
