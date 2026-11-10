@@ -9,6 +9,7 @@ set -euo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
 cd "$(dirname "$(readlink -f "$0")")/.."
 
+source ryanzed/build-env.sh
 script/bundle-linux --skip-sentry
 
 tmp="$(mktemp -d)"
