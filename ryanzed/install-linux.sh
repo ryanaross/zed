@@ -9,6 +9,10 @@ set -euo pipefail
 export PATH="$HOME/.cargo/bin:$PATH"
 cd "$(dirname "$(readlink -f "$0")")/.."
 
+# Lowest CPU and idle I/O priority, so the desktop stays responsive while it builds.
+renice -n 19 -p $$ >/dev/null
+ionice -c 3 -p $$ 2>/dev/null || true
+
 source ryanzed/build-env.sh
 script/bundle-linux --skip-sentry
 
