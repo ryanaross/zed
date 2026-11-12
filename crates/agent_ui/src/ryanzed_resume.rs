@@ -52,6 +52,10 @@ struct Record {
     /// The agent was running the last time we looked, so a restore should resume it.
     running: bool,
     working_directory: Option<PathBuf>,
+    /// Set by `seed`: an exact command given from outside (e.g. `claude --resume <id>`).
+    /// Over ssh it is kept instead of the vaguer title-based guess.
+    #[serde(default)]
+    seeded: bool,
 }
 
 struct Live {
@@ -110,6 +114,32 @@ pub(crate) fn resume_command(id: TerminalId, cx: &mut App) -> Option<String> {
         .map(|record| record.command)
 }
 
+/// Record `command` as this terminal's resume command before it spawns, so the spawn runs
+/// it (see `AgentPanel::new_terminal_running`).
+pub(crate) fn seed(
+    id: TerminalId,
+    command: String,
+    working_directory: Option<PathBuf>,
+    cx: &mut App,
+) {
+    let program = command
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    set_record(
+        id,
+        Some(Record {
+            program,
+            command,
+            running: true,
+            working_directory,
+            seeded: true,
+        }),
+        cx,
+    );
+}
+
 /// Called whenever the terminal reports activity. Cheap: does real work at most every
 /// `CHECK_INTERVAL` per terminal, and file lookups run in the background.
 pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App) {
@@ -153,12 +183,20 @@ pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App)
     if program == "ssh" {
         match remote_resume_from_title(&title) {
             RemoteTitle::Agent { program, command } => {
-                let updated = Some(Record {
-                    program,
-                    command,
-                    running: true,
-                    working_directory: cwd,
-                });
+                let existing = record(id, cx);
+                let updated = match existing {
+                    Some(seeded) if seeded.seeded && seeded.program == program => Some(Record {
+                        running: true,
+                        ..seeded
+                    }),
+                    _ => Some(Record {
+                        program,
+                        command,
+                        running: true,
+                        working_directory: cwd,
+                        seeded: false,
+                    }),
+                };
                 if updated != record(id, cx) {
                     set_record(id, updated, cx);
                 }
@@ -206,6 +244,7 @@ pub(crate) fn observe(id: TerminalId, terminal: &Entity<Terminal>, cx: &mut App)
                     command,
                     running: true,
                     working_directory: cwd,
+                    seeded: false,
                 }),
                 // Session file not found (yet), e.g. a resumed codex/pi session that has
                 // not written anything since it started: keep what we had.
