@@ -2406,6 +2406,7 @@ impl AgentPanel {
             terminal.report_started_terminal_program(terminal_id, source, cx);
             let terminal = terminal.view.read(cx).terminal().clone(); // fork
             crate::ryanzed_resume::observe(terminal_id, &terminal, cx);
+            crate::ryanzed_activity::observe(terminal_id, &terminal, cx); // fork
         }
     }
 
