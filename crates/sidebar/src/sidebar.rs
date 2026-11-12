@@ -374,6 +374,8 @@ struct TerminalEntry {
     worktrees: Vec<ThreadItemWorktreeInfo>,
     has_notification: bool,
     highlight_positions: Vec<usize>,
+    /// fork: terminal threads sort by last message; the creation time if never messaged.
+    display_time: DateTime<Utc>,
 }
 
 impl ThreadEntry {
@@ -1507,6 +1509,10 @@ impl Sidebar {
             }
         }
 
+        // fork: terminal threads sort by last message.
+        let terminal_interacted_at =
+            |id: TerminalId| agent_ui::ryanzed_activity::terminal_interacted_at(id, cx);
+
         for group in &groups {
             let group_key = &group.key;
             let group_workspaces = &group.workspaces;
@@ -1532,12 +1538,15 @@ impl Sidebar {
                         worktree_info_from_thread_paths(&metadata.worktree_paths, &branch_by_path);
                     let has_notification =
                         live_notified_terminal_ids.contains(&metadata.terminal_id);
+                    let display_time = terminal_interacted_at(metadata.terminal_id)
+                        .map_or(metadata.created_at, |time| time.max(metadata.created_at));
                     TerminalEntry {
                         metadata,
                         workspace,
                         worktrees,
                         has_notification,
                         highlight_positions: Vec::new(),
+                        display_time,
                     }
                 };
 
@@ -5922,7 +5931,7 @@ impl Sidebar {
                     DateTime::<Utc>::MAX_UTC
                 }
                 ListEntry::Thread(thread) => Sidebar::thread_display_time(&thread.metadata),
-                ListEntry::Terminal(terminal) => terminal.metadata.created_at,
+                ListEntry::Terminal(terminal) => terminal.display_time, // fork
                 ListEntry::ProjectHeader { .. } => unreachable!(),
             }
         }
@@ -6029,7 +6038,7 @@ impl Sidebar {
                 }
                 ListEntry::Terminal(terminal) => {
                     let timestamp: SharedString =
-                        format_history_entry_timestamp(terminal.metadata.created_at).into();
+                        format_history_entry_timestamp(terminal.display_time).into(); // fork
                     Some(ThreadSwitcherEntry::Terminal(ThreadSwitcherTerminalEntry {
                         metadata: terminal.metadata.clone(),
                         workspace: terminal.workspace.clone(),
@@ -6694,7 +6703,7 @@ impl Sidebar {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = ElementId::from(format!("terminal-{}", terminal.metadata.terminal_id));
-        let timestamp = format_history_entry_timestamp(terminal.metadata.created_at);
+        let timestamp = format_history_entry_timestamp(terminal.display_time); // fork
         let is_hovered = self.hovered_thread_index == Some(ix);
         let color = cx.theme().colors();
         let sidebar_bg = color.panel_background;
