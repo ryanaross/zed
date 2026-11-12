@@ -80,6 +80,10 @@ pub enum OpenRequestKind {
     GitCommit {
         sha: String,
     },
+    /// fork: open the request's path and run `command` in a new agent terminal.
+    RyanzedAgentTerminal {
+        command: String,
+    },
 }
 
 impl std::fmt::Debug for OpenRequestKind {
@@ -118,6 +122,10 @@ impl std::fmt::Debug for OpenRequestKind {
                 .field("repo_url", repo_url)
                 .finish(),
             Self::GitCommit { sha } => f.debug_struct("GitCommit").field("sha", sha).finish(),
+            Self::RyanzedAgentTerminal { command } => f
+                .debug_struct("RyanzedAgentTerminal")
+                .field("command", command)
+                .finish(),
         }
     }
 }
@@ -174,6 +182,8 @@ impl OpenRequest {
                 });
             } else if url.starts_with(agent_skills::SKILL_SHARE_LINK_PREFIX) {
                 this.parse_skill_install_url(&url)?
+            } else if let Some(query) = url.strip_prefix("zed://ryanzed/agent-terminal?") {
+                this.parse_ryanzed_agent_terminal_url(query, cx)? // fork
             } else if let Some(agent_path) = url.strip_prefix("zed://agent") {
                 this.parse_agent_url(agent_path)
             } else if url == "zed://" || url == "zed://open" || url == "zed://open/" {
@@ -218,6 +228,30 @@ impl OpenRequest {
         if let Some(decoded) = urlencoding::decode(file).log_err() {
             self.open_paths.push(decoded.into_owned())
         }
+    }
+
+    /// fork: `zed://ryanzed/agent-terminal?cmd=<command>&path=<dir | ssh://host/dir>`, both
+    /// values url-encoded. Opens the path and runs the command in a new agent terminal.
+    fn parse_ryanzed_agent_terminal_url(&mut self, query: &str, cx: &App) -> Result<()> {
+        let (mut command, mut path) = (None, None);
+        for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+            match key.as_ref() {
+                "cmd" => command = Some(value.into_owned()),
+                "path" => path = Some(value.into_owned()),
+                _ => {}
+            }
+        }
+        let command = command
+            .filter(|command| !command.trim().is_empty())
+            .context("agent-terminal url needs a cmd")?;
+        let path = path.context("agent-terminal url needs a path")?;
+        if path.starts_with("ssh://") {
+            self.parse_ssh_file_path(&path, cx)?;
+        } else {
+            self.open_paths.push(path);
+        }
+        self.kind = Some(OpenRequestKind::RyanzedAgentTerminal { command });
+        Ok(())
     }
 
     fn parse_agent_url(&mut self, agent_path: &str) {
@@ -1492,6 +1526,53 @@ mod tests {
             }
             _ => panic!("Expected AgentPanel kind"),
         }
+    }
+
+    // fork
+    #[gpui::test]
+    fn test_parse_ryanzed_agent_terminal_url(cx: &mut TestAppContext) {
+        let _app_state = init_test(cx);
+        let parse = |url: &str, cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                OpenRequest::parse(
+                    RawOpenRequest {
+                        urls: vec![url.into()],
+                        ..Default::default()
+                    },
+                    cx,
+                )
+            })
+        };
+
+        let request = parse(
+            "zed://ryanzed/agent-terminal?cmd=claude%20--resume%20abc&path=%2Ftmp%2Fmy%20proj",
+            cx,
+        )
+        .unwrap();
+        assert_eq!(request.open_paths, vec!["/tmp/my proj".to_string()]);
+        assert!(request.remote_connection.is_none());
+        match request.kind {
+            Some(OpenRequestKind::RyanzedAgentTerminal { command }) => {
+                assert_eq!(command, "claude --resume abc")
+            }
+            _ => panic!("Expected RyanzedAgentTerminal kind"),
+        }
+
+        let request = parse(
+            "zed://ryanzed/agent-terminal?cmd=codex%20resume%20x&path=ssh%3A%2F%2Fexample.com%2Fhome%2Fme%2Fproj",
+            cx,
+        )
+        .unwrap();
+        assert_eq!(request.open_paths, vec!["/home/me/proj".to_string()]);
+        match request.remote_connection {
+            Some(RemoteConnectionOptions::Ssh(options)) => {
+                assert_eq!(options.host, "example.com".into())
+            }
+            other => panic!("Expected an ssh connection, got {other:?}"),
+        }
+
+        assert!(parse("zed://ryanzed/agent-terminal?path=%2Ftmp", cx).is_err());
+        assert!(parse("zed://ryanzed/agent-terminal?cmd=claude", cx).is_err());
     }
 
     #[gpui::test]

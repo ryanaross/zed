@@ -2001,6 +2001,39 @@ impl AgentPanel {
         );
     }
 
+    /// fork: open a new agent terminal that runs `command` instead of
+    /// `agent.terminal_init_command`. It is recorded as the terminal's resume command,
+    /// so a restart resumes it too.
+    pub fn new_terminal_running(
+        &mut self,
+        command: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.supports_terminal(cx) {
+            log::warn!("agent terminal requested, but this project has no terminal support");
+            return;
+        }
+        let terminal_id = TerminalId::new();
+        let working_directory = self.terminal_working_directory(None, cx);
+        crate::ryanzed_resume::seed(terminal_id, command, working_directory.clone(), cx);
+        // `spawn_terminal` marks this spawn as pending, which also stops a deferred
+        // "initial" terminal from opening next to it.
+        self.spawn_terminal(
+            terminal_id,
+            working_directory,
+            None,
+            None,
+            None,
+            true,
+            true,
+            true,
+            AgentThreadSource::AgentPanel,
+            window,
+            cx,
+        );
+    }
+
     fn terminal_working_directory(
         &self,
         workspace: Option<&Workspace>,
