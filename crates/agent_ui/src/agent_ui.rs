@@ -25,6 +25,7 @@ mod model_search;
 mod model_selector;
 mod model_selector_popover;
 mod profile_selector;
+pub mod ryanzed_activity; // fork: terminal threads sort by last message
 pub mod ryanzed_resume; // fork: resume terminal agents, terminal thread history
 mod terminal_codegen;
 mod terminal_inline_assistant;
@@ -714,6 +715,7 @@ pub fn init(
     context_server_configuration::init(language_registry, fs.clone(), cx);
     thread_metadata_store::init(cx);
     terminal_thread_metadata_store::init(cx);
+    ryanzed_activity::init(cx); // fork: terminal threads sort by last message
 
     inline_assistant::init(fs.clone(), prompt_builder.clone(), cx);
     terminal_inline_assistant::init(fs.clone(), prompt_builder, cx);
