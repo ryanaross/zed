@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod reliability;
+mod ryanzed_agent_terminal; // fork
 mod watcher_debug;
 mod zed;
 
@@ -1009,6 +1010,17 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
             OpenRequestKind::CliConnection(connection) => {
                 cx.spawn(async move |cx| handle_cli_connection(connection, app_state, cx).await)
                     .detach();
+            }
+            OpenRequestKind::RyanzedAgentTerminal { command } => {
+                // fork
+                ryanzed_agent_terminal::open(
+                    command,
+                    request.open_paths,
+                    request.remote_connection,
+                    request.open_behavior,
+                    app_state,
+                    cx,
+                );
             }
             OpenRequestKind::FocusApp => {
                 cx.spawn(async move |cx| {
