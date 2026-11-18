@@ -1536,8 +1536,10 @@ impl Sidebar {
                 |metadata: TerminalThreadMetadata, workspace: ThreadEntryWorkspace| {
                     let worktrees =
                         worktree_info_from_thread_paths(&metadata.worktree_paths, &branch_by_path);
-                    let has_notification =
-                        live_notified_terminal_ids.contains(&metadata.terminal_id);
+                    // fork: terminal thread reminders also cover terminals not yet restored.
+                    let has_notification = live_notified_terminal_ids
+                        .contains(&metadata.terminal_id)
+                        || agent_ui::ryanzed_reminder::is_due(metadata.terminal_id, cx);
                     let display_time = terminal_interacted_at(metadata.terminal_id)
                         .map_or(metadata.created_at, |time| time.max(metadata.created_at));
                     TerminalEntry {

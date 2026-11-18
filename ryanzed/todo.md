@@ -6,3 +6,4 @@ One line per feature. Each becomes its own `fork:` commit (see AGENTS.md, "Addin
 - [x] thread history currently just titles everything new agent thread so its useless
 - [x] closing ryanzed and then reopening should have all the terminal threads resumed. needs to work for codex,claude and pi-coding-agent (pi)
 - [x] disable auto update and update checker
+- [x] terminal thread reminder: bell next to new thread, alert me on that thread after 2, 4, 8 or 24 hours

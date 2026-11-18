@@ -1461,7 +1461,7 @@ impl AgentPanel {
         })
     }
 
-    pub(crate) fn new(workspace: &Workspace, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub(crate) fn new(workspace: &Workspace, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let fs = workspace.app_state().fs.clone();
         let user_store = workspace.app_state().user_store.clone();
         let project = workspace.project();
@@ -1581,6 +1581,7 @@ impl AgentPanel {
         };
 
         panel.ensure_native_agent_connection(cx);
+        crate::ryanzed_reminder::observe_in_panel(window, cx); // fork: terminal thread reminders
         panel
     }
 
@@ -2333,6 +2334,7 @@ impl AgentPanel {
         if had_notification {
             self.dismiss_terminal_notifications(terminal_id, cx);
         }
+        crate::ryanzed_reminder::clear_if_due(terminal_id, cx); // fork: terminal thread reminders
         self.set_base_view(BaseView::Terminal { terminal_id }, focus, window, cx);
         if had_notification {
             cx.emit(AgentPanelEvent::EntryChanged);
@@ -2381,6 +2383,7 @@ impl AgentPanel {
             });
         }
         crate::ryanzed_resume::on_terminal_closed(terminal_id, closing_metadata, cx); // fork
+        crate::ryanzed_reminder::clear(terminal_id, cx); // fork: terminal thread reminders
         if was_active {
             self.base_view = BaseView::Uninitialized;
             self.refresh_base_view_subscriptions(window, cx);
@@ -2683,7 +2686,7 @@ impl AgentPanel {
         }
     }
 
-    fn mark_terminal_notification(
+    pub(crate) fn mark_terminal_notification(
         &mut self,
         terminal_id: TerminalId,
         window: &mut Window,
@@ -2904,7 +2907,12 @@ impl AgentPanel {
         dismissed
     }
 
-    fn active_terminal_visible(&self, terminal_id: TerminalId, window: &Window, cx: &App) -> bool {
+    pub(crate) fn active_terminal_visible(
+        &self,
+        terminal_id: TerminalId,
+        window: &Window,
+        cx: &App,
+    ) -> bool {
         if !window.is_window_active() {
             return false;
         }
@@ -6289,6 +6297,13 @@ impl AgentPanel {
                         .flex_none()
                         .gap_1()
                         .children(sandbox_status)
+                        // fork: terminal thread reminders
+                        .when(matches!(mode, ToolbarMode::Terminal), |this| {
+                            this.children(crate::ryanzed_reminder::render_button(
+                                self.active_terminal_id(),
+                                cx,
+                            ))
+                        })
                         .when(can_create_entries, |this| this.child(new_thread_menu))
                         .child(full_screen_button)
                         .child(self.render_panel_options_menu(window, cx)),
@@ -14861,6 +14876,60 @@ mod tests {
                 panel.selected_agent,
                 Agent::Stub,
                 "selected_agent should be restored to the original after an agent override"
+            );
+        });
+    }
+
+    // fork: terminal thread reminders
+    #[gpui::test]
+    async fn test_due_terminal_reminder_rings_and_activation_clears_it(cx: &mut TestAppContext) {
+        let (panel, mut cx) = setup_panel(cx).await;
+        let first_terminal_id = panel
+            .update_in(&mut cx, |panel, window, cx| {
+                panel.insert_test_terminal("Build", true, window, cx)
+            })
+            .expect("first test terminal should be inserted");
+        let second_terminal_id = panel
+            .update_in(&mut cx, |panel, window, cx| {
+                panel.insert_test_terminal("Server", true, window, cx)
+            })
+            .expect("second test terminal should be inserted");
+        cx.run_until_parked();
+
+        cx.update(|_, cx| {
+            crate::ryanzed_reminder::set_at(
+                first_terminal_id,
+                Utc::now() - chrono::Duration::minutes(1),
+                cx,
+            );
+        });
+        cx.run_until_parked();
+        panel.read_with(&cx, |panel, cx| {
+            assert_eq!(panel.active_terminal_id(), Some(second_terminal_id));
+            assert!(crate::ryanzed_reminder::is_due(first_terminal_id, cx));
+        });
+
+        cx.executor().advance_clock(Duration::from_secs(61));
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |panel, cx| {
+            let first_terminal = panel
+                .terminals(cx)
+                .into_iter()
+                .find(|terminal| terminal.id == first_terminal_id)
+                .expect("first terminal should remain in the panel");
+            assert!(first_terminal.has_notification);
+        });
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            panel.activate_terminal(first_terminal_id, true, window, cx);
+        });
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |_panel, cx| {
+            assert_eq!(
+                crate::ryanzed_reminder::remind_at(first_terminal_id, cx),
+                None
             );
         });
     }
