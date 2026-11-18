@@ -28,6 +28,7 @@ mod profile_selector;
 pub mod ryanzed_activity; // fork: terminal threads sort by last message
 pub mod ryanzed_reminder; // fork: terminal thread reminders
 pub mod ryanzed_resume; // fork: resume terminal agents, terminal thread history
+mod ryanzed_terminal_only; // fork: terminal-only agent panel
 mod terminal_codegen;
 mod terminal_inline_assistant;
 pub mod terminal_thread_metadata_store;

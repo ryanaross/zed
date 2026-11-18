@@ -2050,7 +2050,8 @@ impl AgentPanel {
     }
 
     pub fn should_create_terminal_for_new_entry(&self, cx: &App) -> bool {
-        self.last_created_entry_kind == AgentPanelEntryKind::Terminal
+        (self.last_created_entry_kind == AgentPanelEntryKind::Terminal
+            || crate::ryanzed_terminal_only::enabled(cx)) // fork: terminal-only agent panel
             && self.project.read(cx).supports_terminal(cx)
     }
 
@@ -3031,6 +3032,11 @@ impl AgentPanel {
         cx: &mut Context<Self>,
     ) {
         if !self.has_open_project(cx) {
+            return;
+        }
+        // fork: terminal-only agent panel
+        if crate::ryanzed_terminal_only::activate_terminal_instead_of_draft(self, focus, window, cx)
+        {
             return;
         }
 
@@ -6304,7 +6310,18 @@ impl AgentPanel {
                                 cx,
                             ))
                         })
-                        .when(can_create_entries, |this| this.child(new_thread_menu))
+                        // fork: terminal-only agent panel
+                        .when(can_create_entries, |this| {
+                            if crate::ryanzed_terminal_only::enabled(cx) {
+                                this.child(
+                                    crate::ryanzed_terminal_only::render_new_terminal_button(
+                                        self.focus_handle(cx),
+                                    ),
+                                )
+                            } else {
+                                this.child(new_thread_menu)
+                            }
+                        })
                         .child(full_screen_button)
                         .child(self.render_panel_options_menu(window, cx)),
                 )
@@ -14931,6 +14948,39 @@ mod tests {
                 crate::ryanzed_reminder::remind_at(first_terminal_id, cx),
                 None
             );
+        });
+    }
+
+    // fork: terminal-only agent panel
+    #[gpui::test]
+    async fn test_terminal_only_closing_a_terminal_shows_another_terminal(cx: &mut TestAppContext) {
+        let (panel, mut cx) = setup_panel(cx).await;
+        cx.update(|_, cx| cx.set_global(crate::ryanzed_terminal_only::TerminalOnly(true)));
+        let first_terminal_id = panel
+            .update_in(&mut cx, |panel, window, cx| {
+                panel.insert_test_terminal("Build", true, window, cx)
+            })
+            .expect("first test terminal should be inserted");
+        let second_terminal_id = panel
+            .update_in(&mut cx, |panel, window, cx| {
+                panel.insert_test_terminal("Server", true, window, cx)
+            })
+            .expect("second test terminal should be inserted");
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |panel, cx| {
+            assert_eq!(panel.active_terminal_id(), Some(second_terminal_id));
+            assert!(panel.should_create_terminal_for_new_entry(cx));
+        });
+
+        panel.update_in(&mut cx, |panel, window, cx| {
+            panel.close_terminal(second_terminal_id, window, cx);
+        });
+        cx.run_until_parked();
+
+        panel.read_with(&cx, |panel, _cx| {
+            assert_eq!(panel.active_terminal_id(), Some(first_terminal_id));
+            assert!(panel.draft_thread.is_none());
         });
     }
 }
