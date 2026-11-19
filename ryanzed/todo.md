@@ -8,3 +8,4 @@ One line per feature. Each becomes its own `fork:` commit (see AGENTS.md, "Addin
 - [x] disable auto update and update checker
 - [x] terminal thread reminder: bell next to new thread, alert me on that thread after 2, 4, 8 or 24 hours
 - [x] disable Zed Agent and Claude Agent in the agent panel, terminal only
+- [x] terminal alerts on home: drop GNOME's generic "<project> is ready" banner, keep the pop-up with the thread title
